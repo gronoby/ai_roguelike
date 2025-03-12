@@ -43,7 +43,62 @@ flecs::entity create_monster(flecs::world &ecs, Color col, const char *texture_s
     .set(Team{1})
     .set(NumActions{1, 0})
     .set(MeleeDamage{20.f})
-    .set(Blackboard{});
+    .set(Blackboard{})
+    .set(IsHealable{1});
+}
+flecs::entity create_knight(flecs::world& ecs, Color col, const char* texture_src)
+{
+    Position pos = find_free_dungeon_tile(ecs);
+
+    flecs::entity textureSrc = ecs.entity(texture_src);
+    return ecs.entity()
+        .set(Position{ pos.x, pos.y })
+        .set(MovePos{ pos.x, pos.y })
+        .set(Hitpoints{ 100.f })
+        .set(Action{ EA_NOP })
+        .set(Color{ col })
+        .add<TextureSource>(textureSrc)
+        .set(Team{ 0 })
+        .set(NumActions{ 1, 0 })
+        .set(MeleeDamage{ 20.f })
+        .set(Blackboard{})
+        .set(IsHealable{ 1 });
+}
+
+flecs::entity create_monster_spawner(flecs::world& ecs, Color col, const char* texture_src, const int team) {
+    Position pos = find_free_dungeon_tile(ecs);
+
+    flecs::entity textureSrc = ecs.entity(texture_src);
+    return ecs.entity()
+        .set(Position{ pos.x, pos.y })
+        .set(MovePos{ pos.x, pos.y })
+        .set(Hitpoints{ 100.f })
+        .set(Action{ EA_SPAWN })
+        .set(Color{ col })
+        .add<TextureSource>(textureSrc)
+        .set(Team{ team })
+        .set(NumActions{ 1, 0 })
+        .set(Spawner{})
+        .set(MeleeDamage{ 0.f })
+        .set(Blackboard{});
+}
+
+flecs::entity create_heal_spawner(flecs::world& ecs, Color col, const char* texture_src, const int team) {
+    Position pos = find_free_dungeon_tile(ecs);
+
+    flecs::entity textureSrc = ecs.entity(texture_src);
+    return ecs.entity()
+        .set(Position{ pos.x, pos.y })
+        .set(Hitpoints{ 100.f })
+        .set(Action{ EA_SPAWN })
+        .set(Color{ col })
+        .add<TextureSource>(textureSrc)
+        .set(Team{ team })
+        .set(NumActions{ 1, 0 })
+        .set(Spawner{})
+        .set(MeleeDamage{ 0.f })
+        .set(Blackboard{})
+        .set(IsHealable{ 0 });
 }
 
 void create_player(flecs::world &ecs, const char *texture_src)
@@ -62,15 +117,16 @@ void create_player(flecs::world &ecs, const char *texture_src)
     .set(NumActions{2, 0})
     .set(Color{255, 255, 255, 255})
     .add<TextureSource>(textureSrc)
-    .set(MeleeDamage{50.f});
+    .set(MeleeDamage{50.f})
+    .set(IsHealable{ 1 });
 }
 
-void create_heal(flecs::world &ecs, int x, int y, float amount)
+void create_heal(flecs::world &ecs,int x, int y, float amount)
 {
   ecs.entity()
     .set(Position{x, y})
     .set(HealAmount{amount})
-    .set(Color{0xff, 0x44, 0x44, 0xff});
+    .set(Color{0x44, 0x44, 0xff, 0xff});
 }
 
 void create_powerup(flecs::world &ecs, int x, int y, float amount)

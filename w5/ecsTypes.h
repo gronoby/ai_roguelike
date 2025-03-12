@@ -8,6 +8,14 @@
 struct Position;
 struct MovePos;
 
+struct Spawner
+{
+    int time_to_spawn = 10;
+    int curr_time = 0;
+};
+
+
+
 struct MovePos
 {
   int x = 0;
@@ -73,7 +81,8 @@ enum Actions
   EA_ATTACK = EA_MOVE_END,
   EA_HEAL_SELF,
   EA_PASS,
-  EA_NUM
+  EA_NUM,
+  EA_SPAWN
 };
 
 struct Action
@@ -118,6 +127,9 @@ struct Symbol
 };
 
 struct IsPlayer {};
+struct IsHealable {
+    int ishealable = 0;
+};
 
 struct WorldInfoGatherer {};
 

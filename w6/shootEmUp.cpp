@@ -88,12 +88,12 @@ void init_shoot_em_up(flecs::world &ecs)
     .set(Texture2D{LoadTexture("assets/minotaur.png")});
 
 
-  /*
+  
   steer::create_seeker(create_monster(ecs, {+400, +400}, WHITE, "minotaur_tex"));
   steer::create_pursuer(create_monster(ecs, {-400, +400}, RED, "minotaur_tex"));
   steer::create_evader(create_monster(ecs, {-400, -400}, BLUE, "minotaur_tex"));
   steer::create_fleer(create_monster(ecs, {+400, -400}, GREEN, "minotaur_tex"));
-  */
+  
 
   create_player(ecs, {0, 0}, "swordsman_tex");
 

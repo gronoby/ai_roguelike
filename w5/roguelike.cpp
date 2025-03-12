@@ -140,6 +140,8 @@ void init_roguelike(flecs::world &ecs)
     .set(Texture2D{LoadTexture("assets/swordsman.png")});
   ecs.entity("minotaur_tex")
     .set(Texture2D{LoadTexture("assets/minotaur.png")});
+  ecs.entity("monster_spawner")
+      .set(Texture2D{ LoadTexture("assets/monster_spawner.png") });
 
   ecs.observer<Texture2D>()
     .event(flecs::OnRemove)
@@ -148,11 +150,18 @@ void init_roguelike(flecs::world &ecs)
         UnloadTexture(texture);
       });
 
-  create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
-  create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
-  create_hive_monster(create_monster(ecs, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
-  create_hive(create_player_fleer(create_monster(ecs, Color{0, 255, 0, 255}, "minotaur_tex")));
+  //create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  //create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  //create_hive_monster(create_monster(ecs, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
+  //create_monster_approacher(create_knight(ecs, Color{ 0x55, 0x55, 0x55, 0xff }, "swordsman_tex"));
+  //create_hive(create_player_fleer(create_monster(ecs, Color{0, 255, 0, 255}, "minotaur_tex")));
 
+  create_monster_spawner(ecs, Color{ 0xff, 0x00, 0x00, 0xff }, "monster_spawner", 1);
+  create_monster_spawner(ecs, Color{ 0x00, 0xff, 0x00, 0xff }, "monster_spawner", 0);
+  create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
+  create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
+  create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
+  create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
   create_player(ecs, "swordsman_tex");
 
   ecs.entity("world")
@@ -243,6 +252,7 @@ static void process_actions(flecs::world &ecs)
   auto processActions = ecs.query<Action, Position, MovePos, const MeleeDamage, const Team>();
   auto processHeals = ecs.query<Action, Hitpoints>();
   auto checkAttacks = ecs.query<const MovePos, Hitpoints, const Team>();
+  auto processSpawns = ecs.query<Action, Spawner, Position, const Team>();
   // Process all actions
   ecs.defer([&]
   {
@@ -282,6 +292,19 @@ static void process_actions(flecs::world &ecs)
       pos = mpos;
       a.action = EA_NOP;
     });
+    processSpawns.each([&](Action &a, Spawner &s, Position& pos, const Team& t)
+    {
+        s.curr_time += 1;
+        if (s.curr_time >= s.time_to_spawn) {
+            s.curr_time = 0;
+            if (t.team == 1)
+                create_hive_monster(create_monster(ecs, Color{ 0xee, 0x00, 0xee, 0xff }, "minotaur_tex"));
+            else if (t.team == 0)
+                create_monster_approacher(create_knight(ecs, Color{ 0x55, 0x55, 0x55, 0xff }, "swordsman_tex"));
+            else if (t.team == 2)
+                create_heal(ecs, pos.x, pos.y, 50);
+        }
+    });
   });
 
   auto deleteAllDead = ecs.query<const Hitpoints>();
@@ -294,18 +317,20 @@ static void process_actions(flecs::world &ecs)
     });
   });
 
-  auto playerPickup = ecs.query<const IsPlayer, const Position, Hitpoints, MeleeDamage>();
+  auto playerPickup = ecs.query<const IsHealable, const Position, Hitpoints, MeleeDamage>();
   auto healPickup = ecs.query<const Position, const HealAmount>();
   auto powerupPickup = ecs.query<const Position, const PowerupAmount>();
   ecs.defer([&]
   {
-    playerPickup.each([&](const IsPlayer&, const Position &pos, Hitpoints &hp, MeleeDamage &dmg)
+    playerPickup.each([&](const IsHealable &ish, const Position &pos, Hitpoints &hp, MeleeDamage &dmg)
     {
       healPickup.each([&](flecs::entity entity, const Position &ppos, const HealAmount &amt)
       {
-        if (pos == ppos)
+        if (pos == ppos && ish.ishealable == 1)
         {
           hp.hitpoints += amt.amount;
+          if(hp.hitpoints > 100)
+            hp.hitpoints = 100;
           entity.destruct();
         }
       });
@@ -370,6 +395,7 @@ void process_turn(flecs::world &ecs)
     if (upd_player_actions_count(ecs))
     {
       // Plan action for NPCs
+      
       gather_world_info(ecs);
       ecs.defer([&]
       {
@@ -401,6 +427,16 @@ void process_turn(flecs::world &ecs)
     dmaps::gen_hive_pack_map(ecs, hiveMap);
     ecs.entity("hive_map")
       .set(DijkstraMapData{hiveMap});
+
+    std::vector<float> monster_approach_Map;
+    dmaps::gen_monster_approach_map(ecs, monster_approach_Map);
+    ecs.entity("monster_approach_map")
+        .set(DijkstraMapData{ monster_approach_Map });
+
+    std::vector<float> heal_Map;
+    dmaps::gen_monster_approach_map(ecs, heal_Map);
+    ecs.entity("heal_Map")
+        .set(DijkstraMapData{ heal_Map });
 
     //ecs.entity("flee_map").add<VisualiseMap>();
     ecs.entity("hive_follower_sum")
