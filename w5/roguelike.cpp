@@ -150,7 +150,7 @@ void init_roguelike(flecs::world &ecs)
         UnloadTexture(texture);
       });
 
-  //create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  //create_monster_logic(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
   //create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
   //create_hive_monster(create_monster(ecs, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
   //create_monster_approacher(create_knight(ecs, Color{ 0x55, 0x55, 0x55, 0xff }, "swordsman_tex"));
@@ -253,6 +253,7 @@ static void process_actions(flecs::world &ecs)
   auto processHeals = ecs.query<Action, Hitpoints>();
   auto checkAttacks = ecs.query<const MovePos, Hitpoints, const Team>();
   auto processSpawns = ecs.query<Action, Spawner, Position, const Team>();
+  auto processUtility = ecs.query<Action, const Team, Hitpoints, const IsMovable>();
   // Process all actions
   ecs.defer([&]
   {
@@ -269,6 +270,7 @@ static void process_actions(flecs::world &ecs)
     {
       Position nextPos = move_pos(pos, a.action);
       bool blocked = !dungeon::is_tile_walkable(ecs, nextPos);
+      
       checkAttacks.each([&](flecs::entity enemy, const MovePos &epos, Hitpoints &hp, const Team &enemy_team)
       {
         if (entity != enemy && epos == nextPos)
@@ -298,12 +300,26 @@ static void process_actions(flecs::world &ecs)
         if (s.curr_time >= s.time_to_spawn) {
             s.curr_time = 0;
             if (t.team == 1)
-                create_hive_monster(create_monster(ecs, Color{ 0xee, 0x00, 0xee, 0xff }, "minotaur_tex"));
+                create_monster_logic(create_monster(ecs, Color{ 0xee, 0x00, 0xee, 0xff }, "minotaur_tex"));
             else if (t.team == 0)
-                create_monster_approacher(create_knight(ecs, Color{ 0x55, 0x55, 0x55, 0xff }, "swordsman_tex"));
+                create_knight_logic(create_knight(ecs, Color{ 0x55, 0x55, 0x55, 0xff }, "swordsman_tex"));
             else if (t.team == 2)
                 create_heal(ecs, pos.x, pos.y, 50);
         }
+    });
+    processUtility.each([&](flecs::entity e, Action& a, const Team& t, Hitpoints &hp, const IsMovable& flag)
+    {
+            if (flag.isMovable == 1) {
+                if (hp.hitpoints <= 60) {
+                    e.set(DmapWeights{ { {"heal_Map", {1.f, 0.8f}}} });
+                }
+                else if (t.team == 1) {
+                    e.set(DmapWeights{ {{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8, 0.8f}}} });
+                }
+                else if (t.team == 0) {
+                    e.set(DmapWeights{ { {"monster_approach_map", {1.f, 0.8f}}} });
+                }
+            }
     });
   });
 
@@ -412,7 +428,7 @@ void process_turn(flecs::world &ecs)
       turnIncrementer.each([](TurnCounter &tc) { tc.count++; });
     }
     process_actions(ecs);
-
+    //monster logic
     std::vector<float> approachMap;
     dmaps::gen_player_approach_map(ecs, approachMap);
     ecs.entity("approach_map")
@@ -434,7 +450,7 @@ void process_turn(flecs::world &ecs)
         .set(DijkstraMapData{ monster_approach_Map });
 
     std::vector<float> heal_Map;
-    dmaps::gen_monster_approach_map(ecs, heal_Map);
+    dmaps::gen_heal_approach_map(ecs, heal_Map);
     ecs.entity("heal_Map")
         .set(DijkstraMapData{ heal_Map });
 

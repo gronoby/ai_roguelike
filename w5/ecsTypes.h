@@ -14,7 +14,9 @@ struct Spawner
     int curr_time = 0;
 };
 
-
+struct IsMovable {
+    int isMovable = 0;
+};
 
 struct MovePos
 {

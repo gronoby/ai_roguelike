@@ -44,7 +44,8 @@ flecs::entity create_monster(flecs::world &ecs, Color col, const char *texture_s
     .set(NumActions{1, 0})
     .set(MeleeDamage{20.f})
     .set(Blackboard{})
-    .set(IsHealable{1});
+    .set(IsHealable{1})
+    .set(IsMovable{ 1 });
 }
 flecs::entity create_knight(flecs::world& ecs, Color col, const char* texture_src)
 {
@@ -62,7 +63,8 @@ flecs::entity create_knight(flecs::world& ecs, Color col, const char* texture_sr
         .set(NumActions{ 1, 0 })
         .set(MeleeDamage{ 20.f })
         .set(Blackboard{})
-        .set(IsHealable{ 1 });
+        .set(IsHealable{ 1 })
+        .set(IsMovable{1});
 }
 
 flecs::entity create_monster_spawner(flecs::world& ecs, Color col, const char* texture_src, const int team) {
@@ -80,7 +82,8 @@ flecs::entity create_monster_spawner(flecs::world& ecs, Color col, const char* t
         .set(NumActions{ 1, 0 })
         .set(Spawner{})
         .set(MeleeDamage{ 0.f })
-        .set(Blackboard{});
+        .set(Blackboard{})
+        .set(IsMovable{ 0 });
 }
 
 flecs::entity create_heal_spawner(flecs::world& ecs, Color col, const char* texture_src, const int team) {
@@ -98,7 +101,8 @@ flecs::entity create_heal_spawner(flecs::world& ecs, Color col, const char* text
         .set(Spawner{})
         .set(MeleeDamage{ 0.f })
         .set(Blackboard{})
-        .set(IsHealable{ 0 });
+        .set(IsHealable{ 0 })
+        .set(IsMovable{ 0 });
 }
 
 void create_player(flecs::world &ecs, const char *texture_src)
