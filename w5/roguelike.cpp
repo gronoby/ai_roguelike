@@ -1,20 +1,21 @@
-#include "roguelike.h"
-#include "ecsTypes.h"
-#include "raylib.h"
-#include "stateMachine.h"
 #include "aiLibrary.h"
 #include "blackboard.h"
-#include "math.h"
-#include "dungeonUtils.h"
 #include "dijkstraMapGen.h"
-#include "dmapFollower.h"
 #include "dmapBeh.h"
+#include "dmapFollower.h"
+#include "dungeonUtils.h"
+#include "ecsTypes.h"
+#include "math.h"
+#include "raylib.h"
 #include "rlikeObjects.h"
+#include "roguelike.h"
+#include "stateMachine.h"
+#include "steering.h"
 
 
 static void register_roguelike_systems(flecs::world &ecs)
 {
-  ecs.system<PlayerInput, Action, const IsPlayer>()
+  /*ecs.system<PlayerInput, Action, const IsPlayer>()
     .each([&](PlayerInput &inp, Action &a, const IsPlayer)
     {
       bool left = IsKeyDown(KEY_LEFT);
@@ -38,7 +39,25 @@ static void register_roguelike_systems(flecs::world &ecs)
       if (pass && !inp.passed)
         a.action = EA_PASS;
       inp.passed = pass;
-    });
+    });*/
+    static auto playerPosQuery = ecs.query<const Position, const IsPlayer>();
+
+    ecs.system<Velocity, const MoveSpeed, const IsPlayer>()
+        .each([&](Velocity& vel, const MoveSpeed& ms, const IsPlayer)
+            {
+                bool left = IsKeyDown(KEY_LEFT);
+                bool right = IsKeyDown(KEY_RIGHT);
+                bool up = IsKeyDown(KEY_UP);
+                bool down = IsKeyDown(KEY_DOWN);
+                vel.x = ((left ? -1.f : 0.f) + (right ? 1.f : 0.f));
+                vel.y = ((up ? -1.f : 0.f) + (down ? 1.f : 0.f));
+                vel = Velocity{ normalize(vel) * ms.speed };
+            });
+    ecs.system<Position, const Velocity>()
+        .each([&](Position& pos, const Velocity& vel)
+            {
+                pos += vel * ecs.delta_time();
+            });
   ecs.system<const Position, const Color>()
     .with<TextureSource>(flecs::Wildcard)
     .with<BackgroundTile>()
@@ -129,6 +148,7 @@ static void register_roguelike_systems(flecs::world &ecs)
           }
       });
     });
+  steer::register_systems(ecs);
 }
 
 
@@ -150,7 +170,8 @@ void init_roguelike(flecs::world &ecs)
         UnloadTexture(texture);
       });
 
-  //create_monster_logic(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
+  steer::create_warrior(create_monster_logic(create_monster(ecs, Color{ 0xee, 0x00, 0xee, 0xff }, "minotaur_tex")));
+  //steer::create_seeker(create_heal_approacher(create_monster(ecs, Color{ 0xee, 0xff, 0xee, 0xff }, "minotaur_tex")));
   //create_hive_monster(create_monster(ecs, Color{0xee, 0x00, 0xee, 0xff}, "minotaur_tex"));
   //create_hive_monster(create_monster(ecs, Color{0x11, 0x11, 0x11, 0xff}, "minotaur_tex"));
   //create_monster_approacher(create_knight(ecs, Color{ 0x55, 0x55, 0x55, 0xff }, "swordsman_tex"));
@@ -159,10 +180,11 @@ void init_roguelike(flecs::world &ecs)
   create_monster_spawner(ecs, Color{ 0xff, 0x00, 0x00, 0xff }, "monster_spawner", 1);
   create_monster_spawner(ecs, Color{ 0x00, 0xff, 0x00, 0xff }, "monster_spawner", 0);
   create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
-  create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
-  create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
-  create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
+  //create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
+  //create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
+  //create_heal_spawner(ecs, Color{ 0x00, 0x00, 0xff, 0xff }, "monster_spawner", 2);
   create_player(ecs, "swordsman_tex");
+  
 
   ecs.entity("world")
     .set(TurnCounter{})
@@ -190,7 +212,7 @@ void init_dungeon(flecs::world &ecs, char *tiles, size_t w, size_t h)
       char tile = tiles[y * w + x];
       flecs::entity tileEntity = ecs.entity()
         .add<BackgroundTile>()
-        .set(Position{int(x), int(y)})
+        .set(Position{float(x), float(y)})
         .set(Color{255, 255, 255, 255});
       if (tile == dungeon::wall)
         tileEntity.add<TextureSource>(wallTex);
@@ -251,7 +273,7 @@ static void process_actions(flecs::world &ecs)
 {
   auto processActions = ecs.query<Action, Position, MovePos, const MeleeDamage, const Team>();
   auto processHeals = ecs.query<Action, Hitpoints>();
-  auto checkAttacks = ecs.query<const MovePos, Hitpoints, const Team>();
+  auto checkAttacks = ecs.query<const Position, Hitpoints, const Team>();
   auto processSpawns = ecs.query<Action, Spawner, Position, const Team>();
   auto processUtility = ecs.query<Action, const Team, Hitpoints, const IsMovable>();
   // Process all actions
@@ -271,12 +293,12 @@ static void process_actions(flecs::world &ecs)
       Position nextPos = move_pos(pos, a.action);
       bool blocked = !dungeon::is_tile_walkable(ecs, nextPos);
       
-      checkAttacks.each([&](flecs::entity enemy, const MovePos &epos, Hitpoints &hp, const Team &enemy_team)
+      checkAttacks.each([&](flecs::entity enemy, const Position &epos, Hitpoints &hp, const Team &enemy_team)
       {
-        if (entity != enemy && epos == nextPos)
+              if (entity != enemy && (length(epos - nextPos) < 0.3))
         {
           blocked = true;
-          if (team.team != enemy_team.team)
+          if ((team.team != enemy_team.team) && (enemy_team.team != 2))
           {
             push_to_log(ecs, "damaged entity");
             hp.hitpoints -= dmg.damage;
@@ -289,20 +311,20 @@ static void process_actions(flecs::world &ecs)
         mpos = nextPos;
     });
     // now move
-    processActions.each([&](Action &a, Position &pos, MovePos &mpos, const MeleeDamage &, const Team&)
-    {
-      pos = mpos;
-      a.action = EA_NOP;
-    });
+    //processActions.each([&](Action &a, Position &pos, MovePos &mpos, const MeleeDamage &, const Team&)
+    //{
+    //  pos = mpos;
+    //  a.action = EA_NOP;
+    //});
     processSpawns.each([&](Action &a, Spawner &s, Position& pos, const Team& t)
     {
         s.curr_time += 1;
         if (s.curr_time >= s.time_to_spawn) {
             s.curr_time = 0;
             if (t.team == 1)
-                create_monster_logic(create_monster(ecs, Color{ 0xee, 0x00, 0xee, 0xff }, "minotaur_tex"));
+                steer::create_warrior(create_monster_logic(create_monster(ecs, Color{ 0xee, 0x00, 0xee, 0xff }, "minotaur_tex")));
             else if (t.team == 0)
-                create_knight_logic(create_knight(ecs, Color{ 0x55, 0x55, 0x55, 0xff }, "swordsman_tex"));
+                steer::create_warrior(create_knight_logic(create_knight(ecs, Color{ 0x55, 0x55, 0x55, 0xff }, "swordsman_tex")));
             else if (t.team == 2)
                 create_heal(ecs, pos.x, pos.y, 50);
         }
@@ -342,11 +364,11 @@ static void process_actions(flecs::world &ecs)
     {
       healPickup.each([&](flecs::entity entity, const Position &ppos, const HealAmount &amt)
       {
-        if (pos == ppos && ish.ishealable == 1)
+        if ((length(pos - ppos)<1.0) && ish.ishealable == 1)
         {
           hp.hitpoints += amt.amount;
-          if(hp.hitpoints > 100)
-            hp.hitpoints = 100;
+          if(hp.hitpoints > 300)
+            hp.hitpoints = 300;
           entity.destruct();
         }
       });
@@ -403,62 +425,37 @@ static void gather_world_info(flecs::world &ecs)
 
 void process_turn(flecs::world &ecs)
 {
-  auto stateMachineAct = ecs.query<StateMachine>();
-  auto behTreeUpdate = ecs.query<BehaviourTree, Blackboard>();
-  auto turnIncrementer = ecs.query<TurnCounter>();
-  if (is_player_acted(ecs))
-  {
-    if (upd_player_actions_count(ecs))
-    {
-      // Plan action for NPCs
-      
-      gather_world_info(ecs);
-      ecs.defer([&]
-      {
-        stateMachineAct.each([&](flecs::entity e, StateMachine &sm)
-        {
-          sm.act(0.f, ecs, e);
-        });
-        behTreeUpdate.each([&](flecs::entity e, BehaviourTree &bt, Blackboard &bb)
-        {
-          bt.update(ecs, e, bb);
-        });
-        process_dmap_followers(ecs);
-      });
-      turnIncrementer.each([](TurnCounter &tc) { tc.count++; });
-    }
-    process_actions(ecs);
-    //monster logic
-    std::vector<float> approachMap;
-    dmaps::gen_player_approach_map(ecs, approachMap);
-    ecs.entity("approach_map")
-      .set(DijkstraMapData{approachMap});
+  process_dmap_followers(ecs);
+  process_actions(ecs);
+  std::vector<float> approachMap;
+  dmaps::gen_player_approach_map(ecs, approachMap);
+  ecs.entity("approach_map")
+    .set(DijkstraMapData{approachMap});
 
-    std::vector<float> fleeMap;
-    dmaps::gen_player_flee_map(ecs, fleeMap);
-    ecs.entity("flee_map")
-      .set(DijkstraMapData{fleeMap});
+  std::vector<float> fleeMap;
+  dmaps::gen_player_flee_map(ecs, fleeMap);
+  ecs.entity("flee_map")
+    .set(DijkstraMapData{fleeMap});
 
-    std::vector<float> hiveMap;
-    dmaps::gen_hive_pack_map(ecs, hiveMap);
-    ecs.entity("hive_map")
-      .set(DijkstraMapData{hiveMap});
+  std::vector<float> hiveMap;
+  dmaps::gen_hive_pack_map(ecs, hiveMap);
+  ecs.entity("hive_map")
+    .set(DijkstraMapData{hiveMap});
 
-    std::vector<float> monster_approach_Map;
-    dmaps::gen_monster_approach_map(ecs, monster_approach_Map);
-    ecs.entity("monster_approach_map")
-        .set(DijkstraMapData{ monster_approach_Map });
+  std::vector<float> monster_approach_Map;
+  dmaps::gen_monster_approach_map(ecs, monster_approach_Map);
+  ecs.entity("monster_approach_map")
+      .set(DijkstraMapData{ monster_approach_Map });
 
-    std::vector<float> heal_Map;
-    dmaps::gen_heal_approach_map(ecs, heal_Map);
-    ecs.entity("heal_Map")
-        .set(DijkstraMapData{ heal_Map });
+  std::vector<float> heal_Map;
+  dmaps::gen_heal_approach_map(ecs, heal_Map);
+  ecs.entity("heal_Map")
+      .set(DijkstraMapData{ heal_Map });
 
     //ecs.entity("flee_map").add<VisualiseMap>();
-    ecs.entity("hive_follower_sum")
-      .set(DmapWeights{{{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8f, 0.8f}}}})
-      .add<VisualiseMap>();
-  }
+  ecs.entity("hive_follower_sum")
+    .set(DmapWeights{{{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8f, 0.8f}}}})
+    .add<VisualiseMap>();
 }
 
 void print_stats(flecs::world &ecs)

@@ -21,7 +21,7 @@ flecs::entity create_hive_follower(flecs::entity e)
 
 flecs::entity create_monster_logic(flecs::entity e)
 {
-  e.set(DmapWeights{ {{"hive_map", {1.f, 1.f}}, {"approach_map", {1.8, 0.8f}}}});
+  e.set(DmapWeights{ {{"approach_map", {1.8, 0.8f}}}});
   return e;
 }
 

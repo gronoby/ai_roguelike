@@ -13,7 +13,7 @@ Position dungeon::find_walkable_tile(flecs::world &ecs)
     for (size_t y = 0; y < dd.height; ++y)
       for (size_t x = 0; x < dd.width; ++x)
         if (dd.tiles[y * dd.width + x] == dungeon::floor)
-          posList.push_back(Position{int(x), int(y)});
+          posList.push_back(Position{float(x), float(y)});
     size_t rndIdx = size_t(GetRandomValue(0, int(posList.size()) - 1));
     res = posList[rndIdx];
   });

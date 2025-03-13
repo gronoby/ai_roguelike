@@ -258,7 +258,7 @@ int main(int /*argc*/, const char ** /*argv*/)
   }
   init_roguelike(ecs);
   //debug_enemy_planner();
-  debug_looter_planner();
+  //debug_looter_planner();
 
   Camera2D camera = { {0, 0}, {0, 0}, 0.f, 1.f };
   camera.target = Vector2{ 0.f, 0.f };
@@ -277,7 +277,7 @@ int main(int /*argc*/, const char ** /*argv*/)
       BeginMode2D(camera);
         ecs.progress();
       EndMode2D();
-      print_stats(ecs);
+      //print_stats(ecs);
       // Advance to next frame. Process submitted rendering primitives.
     EndDrawing();
   }

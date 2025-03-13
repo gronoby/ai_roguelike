@@ -8,9 +8,27 @@
 struct Position;
 struct MovePos;
 
+struct MovePos
+{
+    float x = 0;
+    float y = 0;
+
+    MovePos& operator=(const Position& rhs);
+};
+
+struct Position
+{
+    float x = 0;
+    float y = 0;
+};
+
+struct Velocity : public Position {};
+
+struct SteerDir : public Position {};
+
 struct Spawner
 {
-    int time_to_spawn = 10;
+    int time_to_spawn = 100;
     int curr_time = 0;
 };
 
@@ -18,32 +36,61 @@ struct IsMovable {
     int isMovable = 0;
 };
 
-struct MovePos
+
+
+inline Position operator-(const Position& lhs, const Position& rhs)
 {
-  int x = 0;
-  int y = 0;
-
-  MovePos &operator=(const Position &rhs);
-};
-
-struct Position
-{
-  int x = 0;
-  int y = 0;
-
-  Position &operator=(const MovePos &rhs);
-};
-
-inline Position &Position::operator=(const MovePos &rhs)
-{
-  x = rhs.x;
-  y = rhs.y;
-  return *this;
+    return Position{ lhs.x - rhs.x, lhs.y - rhs.y };
 }
 
-inline Position operator-(const Position &lhs, const Position &rhs)
+inline Position operator+(const Position& lhs, const Position& rhs)
 {
-  return Position{lhs.x - rhs.x, lhs.y - rhs.y};
+    return { lhs.x + rhs.x, lhs.y + rhs.y };
+}
+
+inline Position& operator+=(Position& lhs, const Position& rhs)
+{
+    lhs = lhs + rhs;
+    return lhs;
+}
+
+inline Position operator*(const Position& lhs, const float scalar)
+{
+    return { lhs.x * scalar, lhs.y * scalar };
+}
+
+inline float safeinv(float v)
+{
+    return fabsf(v) > 1e-7f ? 1.f / v : v;
+}
+
+inline float length_sq(const Position& v)
+{
+    return v.x * v.x + v.y * v.y;
+}
+
+inline float length(const Position& v)
+{
+    return sqrtf(length_sq(v));
+}
+
+inline float dot(const Position& lhs, const Position& rhs)
+{
+    return lhs.x * rhs.x + lhs.y * rhs.y;
+}
+
+inline Position normalize(const Position& v)
+{
+    const float len = length(v);
+    return v * safeinv(len);
+}
+
+inline Position truncate(const Position& v, float len)
+{
+    const float l = length(v);
+    if (l > len)
+        return v * (len / l);
+    return v;
 }
 
 inline MovePos &MovePos::operator=(const Position &rhs)
@@ -64,6 +111,11 @@ struct PatrolPos
 {
   int x = 0;
   int y = 0;
+};
+
+struct MoveSpeed
+{
+    float speed = 0.f;
 };
 
 struct Hitpoints
